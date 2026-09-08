@@ -1,0 +1,52 @@
+version: '3.8'
+services:
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  chromadb:
+    image: chromadb/chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+
+  streamlit:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./docs:/app/docs # Mapeia sua pasta local de markdowns para dentro do container
+    depends_on:
+      - ollama
+      - chromadb
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  celery_worker:
+    build: .
+    command: celery -A app.tasks.tasks worker --loglevel=info
+    volumes:
+      - ./docs:/app/docs
+    depends_on:
+      - redis
+      - ollama
+      - chromadb
+
+volumes:
+  ollama_data:
+  chroma_data:
+  ./docs:
